@@ -50,9 +50,10 @@ def main():
                 SCK=17, 
                 take_zero_point_pin=27)
     oled = OLED()
-    # tcp = TCP_IP()
+    tcp = TCP_IP()
     uart = UART()
     try:
+        switch = False
         while True:
             sensor1_status = sensor1.get_status()
             sensor2_status = sensor2.get_status()
@@ -75,9 +76,12 @@ def main():
                 "sensor_1": sensor1_display,
                 "sensor_2": sensor2_display
             }
-            # tcp.update_queue(data)
-            uart.update_queue(data)
-            time.sleep(1)
+            if switch:
+                tcp.update_queue(data)
+            else:
+                uart.send_data(data)
+            switch = not switch
+            # time.sleep(0.1)
     except (KeyboardInterrupt, SystemExit):
         print("Cleaning...")
         GPIO.cleanup()

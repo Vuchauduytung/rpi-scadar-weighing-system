@@ -1,4 +1,3 @@
-# TCP
 import socket
 import serial
 import time
@@ -26,7 +25,7 @@ class TCP_IP:
                 client, addr = socket.accept()
                 print('Connected by', addr)
                 Process(target=TCP_IP.send_data, args=(
-                    client, addr, queue)).start()
+                        client, addr, queue)).start()
             except Exception as err:
                 print("Socket closed")
                 print(err)
@@ -70,26 +69,18 @@ class UART:
         self.queue = ctx.Queue()
         self.serial.close()
         self.serial.open()
-        Process(target=UART.send_data, args=(self.serial, self.queue)).start()
 
-    @classmethod
-    def send_data(cls, serial: serial.Serial, queue):
+    def send_data(self, data):
         try:
-            while True:
-                if not queue.empty():
-                    data = queue.get()
-                    data_bytes = json.dumps(data).encode('utf-8')
-                    serial.write(data_bytes)
-                    serial.flush()
-                # print("send data successfully")
-                # print(data)
+            serial = self.serial
+            data_bytes = json.dumps(data).encode('utf-8')
+            serial.write(data_bytes)
+            serial.flush()
+            # print("send data successfully")
+            # print(data)
         except Exception as err:
             print(err)
             serial.reset_output_buffer()
             serial.close()
             serial.__del__()
 
-    def update_queue(self, data):
-        while not self.queue.empty():
-            self.queue.get()
-        self.queue.put(data)
