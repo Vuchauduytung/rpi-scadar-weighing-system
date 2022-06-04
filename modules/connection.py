@@ -11,43 +11,57 @@ class TCP_IP:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((HOST, PORT))
         self.socket.listen(2)
+        print("Socket {addr} is opened."\
+            .format(addr=self.socket.getsockname()))
         ctx = mp.get_context('spawn')
-        self.queue = ctx.Queue()
+        self.client_queue = ctx.Queue()
+        self.client_list = []
         print("Waiting for client ...")
-        mp.set_start_method('spawn')
-        Process(target=TCP_IP.wait_and_connect_client,
-                args=(self.socket, self.queue)).start()
+        try:
+            mp.set_start_method('spawn')
+        except RuntimeError:
+            pass
+        self.p = Process(target=TCP_IP.wait_and_connect_client,
+                    args=(self.client_queue, self.socket))
+        self.p.start()
 
-    @classmethod
-    def wait_and_connect_client(cls, socket, queue):
+    # def __del__(self):
+    #     try:
+    #         self.socket.close()
+    #         self.p.TerminateProcess()
+    #         self.p.close() 
+    #     except:
+    #         pass           
+
+    @staticmethod
+    def wait_and_connect_client(client_queue, socket):
         while True:
             try:
                 client, addr = socket.accept()
                 print('Connected by', addr)
-                Process(target=TCP_IP.send_data, args=(
-                        client, addr, queue)).start()
+                client_queue.put((client, addr))
+                print("Client {addr} is connected."\
+                    .format(addr=(client, addr)))
             except Exception as err:
-                print("Socket closed")
+                socket.close()
+                print("Socket {port} is closed"\
+                    .format(addr=socket.getsockname()))
                 print(err)
-                break
+                raise err
+                # break
 
-    @classmethod
-    def send_data(cls, client, addr, queue):
-        while True:
+    def send_data(self, data):
+        data_bytes = json.dumps(data).encode('utf-8')
+        while not self.client_queue.empty():
+            client = self.client_queue.get()
+            self.client_list.append(client)
+        for client, addr in self.client_list:
             try:
-                if not queue.empty():
-                    data = queue.get()
-                    data_bytes = json.dumps(data).encode('utf-8')
-                    client.sendall(data_bytes)
-            except (BrokenPipeError, ConnectionResetError) as err:
-                print("Client {addr} disconnect"
-                      .format(addr=addr))
-                break
-
-    def update_queue(self, data):
-        while not self.queue.empty():
-            self.queue.get()
-        self.queue.put(data)
+                client.sendall(data_bytes)
+            except (BrokenPipeError, ConnectionResetError):
+                print("Client {addr} disconnected."\
+                    .format(addr=addr))
+                self.client_list.remove((client, addr))
 
 
 class UART:
@@ -67,8 +81,13 @@ class UART:
             timeout=timeout)
         ctx = mp.get_context('spawn')
         self.queue = ctx.Queue()
-        self.serial.close()
-        self.serial.open()
+        try:
+            self.serial.open()
+        except serial.SerialException:
+            pass
+        if self.serial.isOpen():
+            print("Port \"{port}\" is opened"\
+                .format(port=self.serial.name))
 
     def send_data(self, data):
         try:
@@ -79,8 +98,8 @@ class UART:
             # print("send data successfully")
             # print(data)
         except Exception as err:
-            print(err)
             serial.reset_output_buffer()
             serial.close()
             serial.__del__()
+            raise err
 

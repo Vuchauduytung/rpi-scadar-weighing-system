@@ -49,14 +49,12 @@ class DistanceSensor:
 
 
 class HX711:
-    def __init__(self, referenceUnit: float, DT: int, SCK: int, take_zero_point_pin: int):
+    def __init__(self, referenceUnit: float, DT: int, SCK: int):
         self.DT = DT
         self.SCK = SCK
         self.referenceUnit = referenceUnit
-        self.tzp_pin = take_zero_point_pin
         self.zero_point = 0
         self.pins_setup()
-        self.setup_interrupt_for_tzp_pin()
 
     def pins_setup(self):
         GPIO.setup(self.DT, GPIO.OUT)
@@ -85,15 +83,8 @@ class HX711:
         GPIO.output(self.SCK, 0)
         return Count
 
-    def setup_interrupt_for_tzp_pin(self):
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.tzp_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        GPIO.add_event_detect(self.tzp_pin, GPIO.FALLING,
-                              callback=self.set_zero_point, bouncetime=100)
-
-    def set_zero_point(self, channel):
-        self.zero_point = self.readCount()
-        print("Set new zero point")
+    def update_zero_point(self, value: float):
+        self.zero_point = value
 
     def read_value(self):
         count = self.readCount()
